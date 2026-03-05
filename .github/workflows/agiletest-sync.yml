@@ -6,13 +6,14 @@ on:
         description: "Test Execution Key from Jira"
       PROJECT_KEY:
         description: "Project Key truyền từ Jira"
+
 env:
-  # Đảm bảo các giá trị này đã được cài trong Settings > Secrets and variables
   BASE_URL: ${{ vars.BASE_URL }}
   BASE_AUTH_URL: ${{ vars.BASE_AUTH_URL }}
   CLIENT_ID: ${{ secrets.CLIENT_ID }}
   CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
-  PROJECT_KEY: ${{ vars.PROJECT_KEY }}
+  # Ưu tiên lấy Project Key từ Jira truyền sang (nếu có)
+  PROJECT_KEY: ${{ github.event.inputs.PROJECT_KEY || vars.PROJECT_KEY }}
 
 jobs:
   run-test:
@@ -30,18 +31,25 @@ jobs:
         run: mvn test
 
       - name: Submit to AgileTest
-        if: always() # Luôn gửi kết quả kể cả khi test fail
+        if: always()
         run: |
-          # Lấy Token
+          # 1. Lấy Token xác thực
           TOKEN=$(curl -s "$BASE_AUTH_URL/api/apikeys/authenticate" \
-            -X POST -H 'Content-Type:application/json' \
+            -H 'Content-Type:application/json' \
             -d "{\"clientId\":\"$CLIENT_ID\",\"clientSecret\":\"$CLIENT_SECRET\"}" | tr -d '"')
           
-          # Tìm file kết quả (đảm bảo đường dẫn chuẩn Maven)
+          if [ -z "$TOKEN" ] || [ "$TOKEN" == "null" ]; then echo "Token rỗng!"; exit 1; fi
+
+          # 2. Tìm file kết quả Maven (JUnit)
           FILE_PATH=$(find target/surefire-reports -name "TEST-*.xml" | head -n 1)
           
-          # Upload
-          curl -X POST "$BASE_URL/ds/test-executions/junit?projectKey=$PROJECT_KEY" \
+          # 3. Upload kết quả chi tiết
+          # Lưu ý: Thêm tham số testExecutionKey vào URL để ghi nhận đúng bản ghi
+          curl -X POST "$BASE_URL/ds/test-executions/junit?projectKey=$PROJECT_KEY&testExecutionKey=${{ github.event.inputs.TEST_EXECUTION_KEY }}" \
+            -H "Content-Type:application/xml" \
+            -H "Authorization:JWT $TOKEN" \
+            --data-binary "@$FILE_PATH"
+
       - name: Update Pipeline Status
         if: always()
         run: |
@@ -51,11 +59,21 @@ jobs:
             RESULT="failed"
           fi
           
-          # Cập nhật lịch sử chạy Pipeline vào AgileTest
-          curl -X POST -H "Content-Type: application/json" \
-            -H "Authorization: JWT $token" \
-            --data "{ \"repository\": \"${{ github.repository }}\", \"runId\": \"${{ github.run_id }}\", \"tool\":\"github\", \"result\":\"$RESULT\" }" \
-            "$BASE_AUTH_URL/api/ds/test-executions/${{inputs.TEST_EXECUTION_KEY}}/pipeline/history?projectKey=$PROJECT_KEY"
-          -H "Content-Type:application/xml" \
-          -H "Authorization:JWT $TOKEN" \
-          --data-binary "@$FILE_PATH"
+          # Lấy lại token cho bước này (hoặc dùng biến từ bước trước nếu được lưu)
+          TOKEN=$(curl -s "$BASE_AUTH_URL/api/apikeys/authenticate" \
+            -X POST -H 'Content-Type:application/json' \
+            -d "{\"clientId\":\"$CLIENT_ID\",\"clientSecret\":\"$CLIENT_SECRET\"}" | tr -d '"')
+
+          # Cập nhật lịch sử chạy Pipeline theo mẫu GitLab
+          # Sử dụng link runId để AgileTest hiển thị nút "View Log"
+          JOB_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          curl -X POST "$BASE_AUTH_URL/ds/test-executions/${{ github.event.inputs.TEST_EXECUTION_KEY }}/pipeline/history?projectKey=$PROJECT_KEY" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: JWT $TOKEN" \
+            --data "{
+              \"jobURL\": \"$JOB_URL\",
+              \"repository\": \"${{ github.repository }}\",
+              \"tool\": \"github\",
+              \"result\": \"$RESULT\"
+            }"
