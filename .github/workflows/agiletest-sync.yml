@@ -1,0 +1,42 @@
+name: AgileTest Sync
+on: [push, workflow_dispatch]
+
+env:
+  # Đảm bảo các giá trị này đã được cài trong Settings > Secrets and variables
+  BASE_URL: ${{ vars.BASE_URL }}
+  BASE_AUTH_URL: ${{ vars.BASE_AUTH_URL }}
+  CLIENT_ID: ${{ secrets.CLIENT_ID }}
+  CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
+  PROJECT_KEY: ${{ vars.PROJECT_KEY }}
+
+jobs:
+  run-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Execute Tests
+        run: mvn test
+
+      - name: Submit to AgileTest
+        if: always() # Luôn gửi kết quả kể cả khi test fail
+        run: |
+          # Lấy Token
+          TOKEN=$(curl -s "$BASE_AUTH_URL/api/apikeys/authenticate" \
+            -X POST -H 'Content-Type:application/json' \
+            -d "{\"clientId\":\"$CLIENT_ID\",\"clientSecret\":\"$CLIENT_SECRET\"}" | tr -d '"')
+          
+          # Tìm file kết quả (đảm bảo đường dẫn chuẩn Maven)
+          FILE_PATH=$(find target/surefire-reports -name "TEST-*.xml" | head -n 1)
+          
+          # Upload
+          curl -X POST "$BASE_URL/ds/test-executions/junit?projectKey=$PROJECT_KEY" \
+            -H "Content-Type:application/xml" \
+            -H "Authorization:JWT $TOKEN" \
+            --data-binary "@$FILE_PATH"
