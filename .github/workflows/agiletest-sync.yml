@@ -1,5 +1,9 @@
 name: AgileTest Sync
-on: [push, workflow_dispatch]
+on:
+  workflow_dispatch:
+    inputs:
+      TEST_EXECUTION_KEY:
+        description: "Test Execution Key from Jira"
 
 env:
   # Đảm bảo các giá trị này đã được cài trong Settings > Secrets and variables
