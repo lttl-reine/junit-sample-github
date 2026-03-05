@@ -37,6 +37,20 @@ jobs:
           
           # Upload
           curl -X POST "$BASE_URL/ds/test-executions/junit?projectKey=$PROJECT_KEY" \
-            -H "Content-Type:application/xml" \
-            -H "Authorization:JWT $TOKEN" \
-            --data-binary "@$FILE_PATH"
+      - name: Update Pipeline Status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            RESULT="success"
+          else
+            RESULT="failed"
+          fi
+          
+          # Cập nhật lịch sử chạy Pipeline vào AgileTest
+          curl -X POST -H "Content-Type: application/json" \
+            -H "Authorization: JWT $token" \
+            --data "{ \"repository\": \"${{ github.repository }}\", \"runId\": \"${{ github.run_id }}\", \"tool\":\"github\", \"result\":\"$RESULT\" }" \
+            "$BASE_AUTH_URL/api/ds/test-executions/${{inputs.TEST_EXECUTION_KEY}}/pipeline/history?projectKey=$PROJECT_KEY"
+          -H "Content-Type:application/xml" \
+          -H "Authorization:JWT $TOKEN" \
+          --data-binary "@$FILE_PATH"
