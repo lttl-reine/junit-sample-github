@@ -4,6 +4,8 @@ on:
     inputs:
       TEST_EXECUTION_KEY:
         description: "Test Execution Key from Jira"
+      PROJECT_KEY:
+        description: "Project Key from Jira"
 env:
   BASE_URL: ${{ vars.BASE_URL }}
   BASE_AUTH_URL: ${{ vars.BASE_AUTH_URL }}
