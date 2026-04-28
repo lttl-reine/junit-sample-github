@@ -4,15 +4,11 @@ on:
     inputs:
       TEST_EXECUTION_KEY:
         description: "Test Execution Key from Jira"
-      PROJECT_KEY:
-        description: "Project Key truyền từ Jira"
-
 env:
   BASE_URL: ${{ vars.BASE_URL }}
   BASE_AUTH_URL: ${{ vars.BASE_AUTH_URL }}
   CLIENT_ID: ${{ secrets.CLIENT_ID }}
   CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
-  # Ưu tiên lấy Project Key từ Jira truyền sang (nếu có)
   PROJECT_KEY: ${{ github.event.inputs.PROJECT_KEY || vars.PROJECT_KEY }}
 
 jobs:
@@ -33,18 +29,17 @@ jobs:
       - name: Submit to AgileTest
         if: always()
         run: |
-          # 1. Lấy Token xác thực
+          # Lấy Token xác thực
           TOKEN=$(curl -s "$BASE_AUTH_URL/api/apikeys/authenticate" \
             -H 'Content-Type:application/json' \
             -d "{\"clientId\":\"$CLIENT_ID\",\"clientSecret\":\"$CLIENT_SECRET\"}" | tr -d '"')
           
           if [ -z "$TOKEN" ] || [ "$TOKEN" == "null" ]; then echo "Token rỗng!"; exit 1; fi
 
-          # 2. Tìm file kết quả Maven (JUnit)
+          # Tìm file kết quả JUnit
           FILE_PATH=$(find target/surefire-reports -name "TEST-*.xml" | head -n 1)
           
-          # 3. Upload kết quả chi tiết
-          # Lưu ý: Thêm tham số testExecutionKey vào URL để ghi nhận đúng bản ghi
+          # Upload kết quả chi tiết
           curl -X POST "$BASE_URL/ds/test-executions/junit?projectKey=$PROJECT_KEY&testExecutionKey=${{ github.event.inputs.TEST_EXECUTION_KEY }}" \
             -H "Content-Type:application/xml" \
             -H "Authorization:JWT $TOKEN" \
@@ -63,9 +58,7 @@ jobs:
           TOKEN=$(curl -s "$BASE_AUTH_URL/api/apikeys/authenticate" \
             -X POST -H 'Content-Type:application/json' \
             -d "{\"clientId\":\"$CLIENT_ID\",\"clientSecret\":\"$CLIENT_SECRET\"}" | tr -d '"')
-
-          # Cập nhật lịch sử chạy Pipeline theo mẫu GitLab
-          # Sử dụng link runId để AgileTest hiển thị nút "View Log"
+            
           JOB_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
           curl -X POST "$BASE_AUTH_URL/ds/test-executions/${{ github.event.inputs.TEST_EXECUTION_KEY }}/pipeline/history?projectKey=$PROJECT_KEY" \
