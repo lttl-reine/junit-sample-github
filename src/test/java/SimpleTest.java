@@ -27,17 +27,9 @@ public class SimpleTest {
     }
 
     @Test
-    @DisplayName("Ví dụ một Test Case gây ra lỗi (Error)")
-    void testRuntimeError() {
-        System.out.println("Đang chạy: testRuntimeError");
-        // Gây ra lỗi chia cho 0 để tạo trạng thái 'Error' thay vì 'Fail'
-        int result = 10 / 0;
-    }
-
-    @Test
     @DisplayName("Kiểm tra tính đúng đắn của logic - Case thành công")
     void testBooleanLogic() {
         boolean isLearningAgileTest = true;
-        assertTrue(isLearningAgileTest, "Linh đang học AgileTest rất tốt!");
+        assertTrue(isLearningAgileTest, "Pass Test Case");
     }
 }
