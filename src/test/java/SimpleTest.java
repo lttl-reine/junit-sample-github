@@ -23,7 +23,7 @@ public class SimpleTest {
     void testSubtractionFail() {
         System.out.println("Đang chạy: testSubtractionFail");
         // Cố tình làm sai để kiểm tra cách hiển thị trên Jira
-        assertEquals(10, 20 - 5, "Kết quả mong đợi là 15 nhưng assertion này sẽ fail");
+        assertEquals(10, 20 - 10);
     }
 
     @Test
